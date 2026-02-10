@@ -20,8 +20,14 @@ export async function telegramWebhook(req: Request, res: Response) {
 
     const chatId = String(message.chat.id)
     const text = message.text.trim()
-    const botToken = req.params.botToken
+    // Get bot token from environment variable (set in Railway)
+    const botToken = process.env.TELEGRAM_BOT_TOKEN
     const username = message.from?.username ?? null
+
+    if (!botToken) {
+      console.error('❌ TELEGRAM_BOT_TOKEN not set in environment')
+      return res.status(500).json({ ok: false, error: 'Bot token not configured' })
+    }
 
     console.log('👤 Chat ID:', chatId)
     console.log('💬 Text:', text)
