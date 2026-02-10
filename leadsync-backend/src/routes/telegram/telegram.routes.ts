@@ -3,10 +3,12 @@ import { telegramWebhook } from './telegram.controller'
 
 const router = Router()
 
-// Standard webhook endpoint (POST for Telegram messages)
+// Webhook endpoint with optional integrationId parameter
+// Supports both /api/telegram/webhook and /api/telegram/webhook/:integrationId
 router.post('/webhook', telegramWebhook)
+router.post('/webhook/:integrationId', telegramWebhook)
 
-// Optional: GET endpoint for health checks
+// GET endpoint for health checks
 router.get('/webhook', (_req, res) => {
   res.json({ 
     status: 'Telegram webhook endpoint active',

@@ -12,10 +12,13 @@ import { MessageSender } from '@prisma/client'
 export async function telegramWebhook(req: Request, res: Response) {
   try {
     console.log('📩 Telegram webhook hit')
+    console.log('🔗 Path params:', req.params)
+    console.log('📦 Request body:', req.body)
 
     const message = req.body?.message
     if (!message?.text) {
-      return res.json({ ok: true })
+      console.log('⚠️ No text message, sending 200 OK')
+      return res.status(200).json({ ok: true })
     }
 
     const chatId = String(message.chat.id)
@@ -26,7 +29,7 @@ export async function telegramWebhook(req: Request, res: Response) {
 
     if (!botToken) {
       console.error('❌ TELEGRAM_BOT_TOKEN not set in environment')
-      return res.status(500).json({ ok: false, error: 'Bot token not configured' })
+      return res.status(200).json({ ok: false, error: 'Bot token not configured' })
     }
 
     console.log('👤 Chat ID:', chatId)
@@ -34,7 +37,10 @@ export async function telegramWebhook(req: Request, res: Response) {
 
     /* -------------------- Company -------------------- */
     const company = await getCompanyByBotToken(botToken)
-    if (!company) return res.json({ ok: true })
+    if (!company) {
+      console.warn('⚠️ Company not found for token, sending 200 OK')
+      return res.status(200).json({ ok: true })
+    }
 
     /* -------------------- Lead -------------------- */
     const lead = await getOrCreateLead(company.id, chatId, username)
@@ -60,7 +66,7 @@ How can we help you?
       await saveMessage(conversation.id, greeting, MessageSender.SYSTEM)
       await sendTelegramMessage(botToken, chatId, greeting)
 
-      return res.json({ ok: true })
+      return res.status(200).json({ ok: true })
     }
 
     /* -------------------- BOT MODE -------------------- */
@@ -74,7 +80,7 @@ How can we help you?
         await saveMessage(conversation.id, handoff, MessageSender.SYSTEM)
         await sendTelegramMessage(botToken, chatId, handoff)
 
-        return res.json({ ok: true })
+        return res.status(200).json({ ok: true })
       }
 
       const botReply = `🤖 Thanks for your message!
@@ -90,9 +96,9 @@ Or type *agent* to talk to a human.`
       await sendTelegramMessage(botToken, chatId, botReply)
     }
 
-    return res.json({ ok: true })
+    return res.status(200).json({ ok: true })
   } catch (err) {
     console.error('❌ Telegram webhook error:', err)
-    return res.status(500).json({ ok: false })
+    return res.status(200).json({ ok: false })
   }
 }
