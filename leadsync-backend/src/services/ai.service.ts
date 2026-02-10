@@ -1,82 +1,157 @@
-import { OpenAI } from 'openai'
+/**
+ * 🤖 AI SERVICE (Sales-Optimized SaaS)
+ * 
+ * Core AI operations:
+ * 1. generateSalesReply() - Auto respond to customers (BOT MODE)
+ * 2. suggestAgentReply() - Help human agents respond faster
+ * 3. summarizeConversation() - Quick summary for agents
+ */
 
+import { OpenAI } from 'openai'
+import { SYSTEM_PROMPT, SHOP_CONTEXT, AGENT_SUGGESTION_PROMPT, SUMMARY_PROMPT } from './ai.prompts'
+import { getConversationContext } from './ai.context'
+
+// Initialize OpenAI client
 const openaiApiKey = process.env.OPENAI_API_KEY
+
 if (!openaiApiKey) {
-  console.warn('⚠️ OPENAI_API_KEY not set. AI auto-reply will be disabled.')
+  console.warn(
+    '⚠️  OPENAI_API_KEY not set. AI auto-reply will be disabled.'
+  )
 }
 
 const client = openaiApiKey ? new OpenAI({ apiKey: openaiApiKey }) : null
 
-interface AIReplyOptions {
-  userMessage: string
-  conversationHistory?: Array<{ role: 'user' | 'assistant'; content: string }>
-  systemPrompt?: string
-  companyName?: string
-}
-
-export async function generateAIReply(options: AIReplyOptions): Promise<string> {
+/**
+ * ✅ MAIN: Generate AI sales reply
+ * Uses:
+ * - SYSTEM_PROMPT (professional sales assistant)
+ * - SHOP_CONTEXT (best-selling products)
+ * - Conversation history (real memory)
+ * - Temperature 0.4 (controlled creativity for sales)
+ */
+export async function generateSalesReply(conversationId: string): Promise<string> {
   if (!client) {
-    return '🤖 AI service is not configured. Please contact support.'
+    return '🤖 AI service is not configured. Please contact support or type "agent" to speak with our team.'
   }
 
   try {
-    const {
-      userMessage,
-      conversationHistory = [],
-      systemPrompt,
-      companyName = 'our service',
-    } = options
+    const conversationHistory = await getConversationContext(conversationId, 10)
 
-    const defaultSystemPrompt = `You are a helpful customer support AI assistant for ${companyName}.
-- Be concise and friendly
-- Provide helpful information
-- If you don't know something, suggest contacting a human agent
-- Keep responses under 300 characters when possible
-- Use emojis appropriately but sparingly`
-
-    const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
-      {
-        role: 'system',
-        content: systemPrompt || defaultSystemPrompt,
-      },
-      ...conversationHistory,
-      {
-        role: 'user',
-        content: userMessage,
-      },
-    ]
-
-    const response = await client.chat.completions.create({
+    const completion = await client.chat.completions.create({
       model: 'gpt-4o-mini',
-      messages,
-      max_tokens: 500,
-      temperature: 0.7,
+      messages: [
+        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'system', content: SHOP_CONTEXT },
+        ...conversationHistory,
+      ],
+      temperature: 0.4, // ✅ Sales = Controlled creativity
+      max_tokens: 300,
     })
 
-    const reply = response.choices[0].message.content
+    const reply = completion.choices[0].message.content
+
     if (!reply) {
       throw new Error('No response from OpenAI')
     }
 
     return reply
   } catch (error) {
-    console.error('❌ AI Service Error:', error)
-    return "🤖 I'm having trouble thinking right now. Let me connect you to a human agent who can help!\n\nType: agreed"
+    console.error('❌ AI Sales Reply Error:', error)
+    return "🤖 I'm having trouble responding right now. Let me connect you with a human agent!\n\nType: agent"
   }
 }
 
-export async function getCompanyAIContext(
-  companyId: string
-): Promise<{ systemPrompt?: string; companyName: string }> {
-  // This can be extended to fetch company-specific AI prompts from database
-  // For now, returning defaults
+/**
+ * ✍️ AGENT-ASSIST: Suggest reply for human agents
+ * Helps agents respond faster without writing from scratch
+ */
+export async function suggestAgentReply(conversationId: string): Promise<string> {
+  if (!client) {
+    return 'AI service not configured'
+  }
 
-  return {
-    systemPrompt: undefined, // Uses default
-    companyName: 'our service', // Should be fetched from company in DB
+  try {
+    const conversationHistory = await getConversationContext(conversationId, 10)
+
+    const completion = await client.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        { role: 'system', content: AGENT_SUGGESTION_PROMPT },
+        { role: 'system', content: SHOP_CONTEXT },
+        ...conversationHistory,
+      ],
+      temperature: 0.5,
+      max_tokens: 200,
+    })
+
+    const suggestion = completion.choices[0].message.content
+
+    if (!suggestion) {
+      throw new Error('No suggestion generated')
+    }
+
+    return suggestion
+  } catch (error) {
+    console.error('❌ Agent Reply Suggestion Error:', error)
+    return 'Unable to generate suggestion'
   }
 }
 
+/**
+ * 🧠 Conversation summary
+ * Quick overview for agents before taking over
+ */
+export async function summarizeConversation(conversationId: string): Promise<string> {
+  if (!client) {
+    return 'AI service not configured'
+  }
+
+  try {
+    const conversationHistory = await getConversationContext(conversationId, 20) // Full context for summary
+
+    const completion = await client.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        { role: 'system', content: SUMMARY_PROMPT },
+        ...conversationHistory,
+      ],
+      temperature: 0.3, // Lower temp for factual summary
+      max_tokens: 250,
+    })
+
+    const summary = completion.choices[0].message.content
+
+    if (!summary) {
+      throw new Error('No summary generated')
+    }
+
+    return summary
+  } catch (error) {
+    console.error('❌ Conversation Summary Error:', error)
+    return 'Unable to generate summary'
+  }
+}
+
+/**
+ * Check if AI is enabled
+ */
 export function isAIEnabled(): boolean {
   return !!client
+}
+
+/**
+ * Health check for AI service
+ */
+export async function checkAIHealth(): Promise<boolean> {
+  if (!client) return false
+
+  try {
+    // Simple health check
+    const response = await client.models.list()
+    return !!response
+  } catch (error) {
+    console.error('❌ AI Health Check Failed:', error)
+    return false
+  }
 }

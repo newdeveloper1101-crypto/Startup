@@ -27,6 +27,7 @@ from telegram.ext import (
 )
 from telegram.constants import ChatAction
 from openai import AsyncOpenAI
+from dashboard import DashboardManager
 
 # Load environment variables
 load_dotenv()
@@ -47,6 +48,7 @@ TEMP_AUDIO_DIR = os.getenv("TEMP_AUDIO_DIR", "./audio_temp")
 
 # Initialize clients
 openai_client = AsyncOpenAI(api_key=OPENAI_API_KEY)
+dashboard_manager = DashboardManager(openai_client)
 
 # ===== 1️⃣ MEMORY MANAGEMENT =====
 
@@ -346,20 +348,110 @@ async def voice_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
         )
 
 
-# ===== 5️⃣ START & HELP COMMANDS =====
+# ===== 5️⃣ LIVE DASHBOARD AI SUMMARIES =====
+
+async def thingspeak(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Get AI summary of ThingSpeak IoT data."""
+    try:
+        # Usage: /thingspeak <channel_id> [api_key]
+        args = context.args
+        
+        if not args:
+            await update.message.reply_text(
+                "❌ Usage: /thingspeak <channel_id> [api_key]\n\n"
+                "Example: /thingspeak 2122234\n"
+                "With API key: /thingspeak 2122234 your_read_key"
+            )
+            return
+        
+        channel_id = args[0]
+        api_key = args[1] if len(args) > 1 else None
+        
+        await update.message.chat.send_action(ChatAction.TYPING)
+        logger.info(f"Fetching ThingSpeak data for channel {channel_id}")
+        
+        summary = await dashboard_manager.get_thingspeak_summary(channel_id, api_key)
+        await update.message.reply_text(summary, parse_mode="Markdown")
+        
+    except Exception as e:
+        logger.error(f"Error in thingspeak handler: {e}")
+        await update.message.reply_text(f"❌ Error: {str(e)}")
+
+
+async def weather(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Get AI summary of weather forecast."""
+    try:
+        # Usage: /weather <latitude> <longitude>
+        args = context.args
+        
+        if not args or len(args) < 2:
+            await update.message.reply_text(
+                "❌ Usage: /weather <latitude> <longitude>\n\n"
+                "Example: /weather 40.7128 -74.0060"
+            )
+            return
+        
+        try:
+            lat = float(args[0])
+            lon = float(args[1])
+        except ValueError:
+            await update.message.reply_text("❌ Invalid coordinates. Use decimal format.\nExample: /weather 40.7128 -74.0060")
+            return
+        
+        await update.message.chat.send_action(ChatAction.TYPING)
+        logger.info(f"Fetching weather for {lat}, {lon}")
+        
+        summary = await dashboard_manager.get_weather_summary(lat, lon)
+        await update.message.reply_text(summary, parse_mode="Markdown")
+        
+    except Exception as e:
+        logger.error(f"Error in weather handler: {e}")
+        await update.message.reply_text(f"❌ Error: {str(e)}")
+
+
+async def analyze(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Get AI analysis of custom API data."""
+    try:
+        # Usage: /analyze <api_url> [analysis_type]
+        args = context.args
+        
+        if not args:
+            await update.message.reply_text(
+                "❌ Usage: /analyze <api_url> [type]\n\n"
+                "Types: general, thingspeak, weather, database\n"
+                "Example: /analyze https://jsonplaceholder.typicode.com/posts/1 general"
+            )
+            return
+        
+        api_url = args[0]
+        analysis_type = args[1] if len(args) > 1 else "general"
+        
+        await update.message.chat.send_action(ChatAction.TYPING)
+        logger.info(f"Analyzing API: {api_url}")
+        
+        summary = await dashboard_manager.get_generic_summary(api_url, analysis_type)
+        await update.message.reply_text(summary, parse_mode="Markdown")
+        
+    except Exception as e:
+        logger.error(f"Error in analyze handler: {e}")
+        await update.message.reply_text(f"❌ Error: {str(e)}")
+
+
+# ===== 6️⃣ START & HELP COMMANDS =====
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Start command."""
     await update.message.reply_text(
         "👋 Welcome to AI Assistant Bot!\n\n"
         "💬 Send text or voice messages\n"
-        "🧠 I remember our conversation\n\n"
+        "🧠 I remember our conversation\n"
+        "📊 Analyze live data with AI\n\n"
         "📌 Commands:\n"
         "/help - Show all commands\n"
         "/status - Current mode & history\n"
-        "/agent - Admin: Take over\n"
-        "/bot - Admin: Resume AI\n"
-        "/clear - Admin: Clear history"
+        "/weather - Weather forecast summary\n"
+        "/thingspeak - IoT data analysis\n"
+        "/analyze - Analyze any API data"
     )
 
 
@@ -373,6 +465,10 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         "📌 General:\n"
         "  /help - Show this message\n"
         "  /status - Show mode & history\n\n"
+        "� Live Dashboard & Analytics:\n"
+        "  /thingspeak <id> [key] - Analyze IoT sensor data\n"
+        "  /weather <lat> <lon> - AI weather summary\n"
+        "  /analyze <url> [type] - Analyze any API data\n\n"
         "👨‍💼 Admin Only:\n"
         "  /agent - Enable human mode\n"
         "  /bot - Resume AI\n"
@@ -380,7 +476,8 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         "ℹ️ Features:\n"
         "  • Conversation memory (last 6 messages)\n"
         "  • Human handover\n"
-        "  • Voice → Text → AI → Voice"
+        "  • Voice → Text → AI → Voice\n"
+        "  • Live data analysis with AI insights"
     )
     await update.message.reply_text(help_text)
 
@@ -417,6 +514,11 @@ def main() -> None:
     app.add_handler(CommandHandler("agent", agent_on))
     app.add_handler(CommandHandler("bot", agent_off))
     app.add_handler(CommandHandler("clear", clear_history))
+    
+    # Dashboard & Analytics handlers
+    app.add_handler(CommandHandler("thingspeak", thingspeak))
+    app.add_handler(CommandHandler("weather", weather))
+    app.add_handler(CommandHandler("analyze", analyze))
     
     # Message handlers (order matters!)
     app.add_handler(MessageHandler(filters.VOICE, voice_handler))

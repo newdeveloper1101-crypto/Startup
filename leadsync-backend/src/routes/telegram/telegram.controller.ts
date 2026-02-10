@@ -8,7 +8,7 @@ import {
   saveMessage,
   getConversationHistory,
 } from '../../services/telegram.service'
-import { generateAIReply, getCompanyAIContext, isAIEnabled } from '../../services/ai.service'
+import { generateSalesReply, suggestAgentReply, summarizeConversation, isAIEnabled } from '../../services/ai.service'
 import { MessageSender } from '@prisma/client'
 
 export async function telegramWebhook(req: Request, res: Response) {
@@ -85,22 +85,14 @@ How can we help you?
         return res.status(200).json({ ok: true })
       }
 
-      // 🤖 Generate AI reply
+      // 🤖 Generate AI sales reply
       let botReply: string
 
       if (isAIEnabled()) {
         try {
-          const history = await getConversationHistory(conversation.id, 8)
-          const aiContext = await getCompanyAIContext(company.id)
+          botReply = await generateSalesReply(conversation.id)
 
-          botReply = await generateAIReply({
-            userMessage: text,
-            conversationHistory: history,
-            companyName: company.name,
-            systemPrompt: aiContext.systemPrompt,
-          })
-
-          console.log('🤖 AI Reply Generated:', botReply)
+          console.log('🤖 AI Sales Reply Generated:', botReply)
         } catch (aiError) {
           console.error('⚠️ AI generation failed, using fallback:', aiError)
           botReply = `🤖 Thanks for your message! How can we help?\n\nType "agent" to speak with a human.`
