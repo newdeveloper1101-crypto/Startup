@@ -69,3 +69,19 @@ export async function saveMessage(
     },
   })
 }
+
+export async function getConversationHistory(
+  conversationId: string,
+  limit: number = 10
+) {
+  const messages = await prisma.message.findMany({
+    where: { conversationId },
+    orderBy: { createdAt: 'asc' },
+    take: limit,
+  })
+
+  return messages.map((msg) => ({
+    role: msg.sender === MessageSender.CLIENT ? ('user' as const) : ('assistant' as const),
+    content: msg.content,
+  }))
+}
