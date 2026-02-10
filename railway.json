@@ -1,10 +1,11 @@
 {
   "$schema": "https://json.schemastore.org/railway.json",
   "build": {
-    "builder": "nixpacks"
+    "builder": "nixpacks",
+    "buildCommand": "cd leadsync-backend && npm ci --omit=dev && npm run build"
   },
   "deploy": {
-    "startCommand": "cd leadsync-backend && npm run build && npm start",
+    "startCommand": "cd leadsync-backend && npm start",
     "restartPolicyMaxRetries": 5
   }
 }
