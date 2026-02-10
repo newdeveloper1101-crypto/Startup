@@ -17,8 +17,12 @@ console.log('🔥 app.ts loaded')
 const app = express()
 
 /* -------------------- Middleware -------------------- */
+// Dynamic CORS configuration for development and production
+const corsOrigin = process.env.FRONTEND_URL || 'http://localhost:5173'
+console.log(`🌐 CORS Origin: ${corsOrigin}`)
+
 app.use(cors({
-  origin: 'http://localhost:5173',
+  origin: corsOrigin,
   credentials: true
 }))
 
@@ -26,7 +30,11 @@ app.use(express.json())
 
 /* -------------------- Health Check -------------------- */
 app.get('/health', (_req, res) => {
-  res.json({ status: 'LeadSync backend running 🚀' })
+  res.json({ 
+    status: 'ok',
+    message: 'LeadSync backend running 🚀',
+    timestamp: new Date().toISOString()
+  })
 })
 
 /* -------------------- API Routes -------------------- */
