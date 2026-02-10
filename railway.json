@@ -2,7 +2,7 @@
   "$schema": "https://json.schemastore.org/railway.json",
   "build": {
     "builder": "nixpacks",
-    "buildCommand": "cd leadsync-backend && npm ci && npm run build"
+    "buildCommand": "cd leadsync-backend && npm ci --omit=dev --loglevel=error && npm run build"
   },
   "deploy": {
     "startCommand": "cd leadsync-backend && npm start",
