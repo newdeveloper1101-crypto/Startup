@@ -1,0 +1,111 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/**
+ * =====================
+ * ENUMS
+ * =====================
+ */
+
+enum ConversationMode {
+  BOT
+  HUMAN
+}
+
+enum Channel {
+  WEBSITE
+  TELEGRAM
+  WHATSAPP
+}
+
+enum Role {
+  OWNER
+  AGENT
+}
+
+enum MessageSender {
+  CLIENT
+  AGENT
+  SYSTEM
+}
+
+/**
+ * =====================
+ * MODELS
+ * =====================
+ */
+
+model Company {
+  id                    String   @id @default(uuid())
+  name                  String
+  telegramBotToken      String?
+  telegramBotUsername   String?
+  telegramWebhookSecret String?  @unique
+  createdAt             DateTime @default(now())
+
+  users         User[]
+  leads         Lead[]
+  conversations Conversation[]
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String
+  name         String
+  passwordHash String
+  role         Role     @default(AGENT)
+  companyId    String
+  createdAt    DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id])
+
+  @@unique([email, companyId])
+}
+
+model Lead {
+  id        String   @id @default(uuid())
+  name      String?
+  contact   String
+  channel   Channel
+  companyId String
+  createdAt DateTime @default(now())
+
+  company       Company        @relation(fields: [companyId], references: [id])
+  conversations Conversation[]
+
+  @@unique([contact, channel, companyId])
+}
+
+model Conversation {
+  id        String           @id @default(uuid())
+  leadId    String
+  companyId String
+  channel   Channel
+  mode      ConversationMode @default(BOT)
+
+  lead     Lead      @relation(fields: [leadId], references: [id])
+  company  Company   @relation(fields: [companyId], references: [id])
+  messages Message[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([companyId])
+  @@index([leadId])
+}
+
+model Message {
+  id             String        @id @default(uuid())
+  content        String
+  sender         MessageSender
+  conversationId String
+  createdAt      DateTime      @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id])
+}
