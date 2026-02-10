@@ -3,8 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Zap, Mail, Lock, User, Building2, ArrowRight } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
-
-const API_URL = 'http://localhost:4000/api';
+import { API_ENDPOINTS } from '../config/api';
 
 export default function Signup() {
   const navigate = useNavigate();
@@ -23,7 +22,7 @@ export default function Signup() {
     setLoading(true);
 
     try {
-      const res = await fetch(`${API_URL}/auth/signup`, {
+      const res = await fetch(API_ENDPOINTS.auth.signup, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
